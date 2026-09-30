@@ -6,30 +6,11 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-// আপনার নতুন সক্রিয় Google Apps Script Web App URL
+// আপনার সঠিক সক্রিয় Google Apps Script URL
 const String scriptUrl = "https://script.google.com/macros/s/AKfycbyzOUFz4Om6ZS0flZEfBTA1DfWX4DTvNmWNggVaro1mcyzkQmt1DFA0kjnKDD2ymqpY/exec";
 
 // SEWTRON অফিসিয়াল লোগো লিংক
 const String logoUrl = "https://i.ibb.co/6P0yN2B/sewtron-logo.png";
-
-// গুগল স্ক্রিপ্টের ৩০২ রিডাইরেক্ট হ্যান্ডলার
-Future<String?> fetchFromGoogle(String url) async {
-  try {
-    final client = http.Client();
-    var uri = Uri.parse(url);
-    var response = await client.get(uri).timeout(const Duration(seconds: 15));
-    
-    if (response.statusCode == 302 || response.statusCode == 301 || response.statusCode == 307) {
-      final redirectUrl = response.headers['location'];
-      if (redirectUrl != null) {
-        response = await client.get(Uri.parse(redirectUrl)).timeout(const Duration(seconds: 15));
-      }
-    }
-    return response.body;
-  } catch (e) {
-    return null;
-  }
-}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,8 +45,9 @@ class AuthenticLampLoginScreen extends StatefulWidget {
 
 class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
   bool isLightOn = false;
-  final TextEditingController userCtrl = TextEditingController(text: "Montaza");
-  final TextEditingController passCtrl = TextEditingController(text: "Montaza123");
+  // ইনপুট বক্স দুটি সম্পূর্ণ খালি (কোনো প্রি-ফিল্ড লেখা নেই)
+  final TextEditingController userCtrl = TextEditingController();
+  final TextEditingController passCtrl = TextEditingController();
   bool isLogging = false;
   String errorMsg = "";
 
@@ -77,27 +59,39 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
   }
 
   Future<void> handleLogin() async {
-    if (userCtrl.text.isEmpty || passCtrl.text.isEmpty) {
-      setState(() => errorMsg = "ইউজারনেম এবং পাসওয়ার্ড দিন!");
+    final inputUser = userCtrl.text.trim();
+    final inputPass = passCtrl.text.trim();
+
+    if (inputUser.isEmpty || inputPass.isEmpty) {
+      setState(() => errorMsg = "ইউজারনেম এবং পাসওয়ার্ড লিখুন!");
       return;
     }
 
-    setState(() { isLogging = true; errorMsg = ""; });
+    setState(() {
+      isLogging = true;
+      errorMsg = "";
+    });
 
     try {
-      final url = "$scriptUrl?action=login&username=${Uri.encodeComponent(userCtrl.text.trim())}&password=${Uri.encodeComponent(passCtrl.text.trim())}";
-      final body = await fetchFromGoogle(url);
+      final targetUri = Uri.parse(
+        "$scriptUrl?action=login&username=${Uri.encodeComponent(inputUser)}&password=${Uri.encodeComponent(inputPass)}"
+      );
 
-      if (body != null) {
-        final data = jsonDecode(body);
+      final response = await http.get(
+        targetUri,
+        headers: {"Accept": "application/json"},
+      ).timeout(const Duration(seconds: 25));
+
+      if (response.statusCode == 200 || response.statusCode == 302) {
+        final data = jsonDecode(response.body);
         if (data['status'] == 'SUCCESS') {
           if (!mounted) return;
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => MainDashboardScreen(
-                user: data['user']['name'],
-                role: data['user']['role'],
+                user: data['user']['name'] ?? inputUser,
+                role: data['user']['role'] ?? "Admin",
               ),
             ),
           );
@@ -106,10 +100,12 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
           setState(() => errorMsg = data['message'] ?? "ইউজারনেম বা পাসওয়ার্ড সঠিক নয়!");
         }
       } else {
-        setState(() => errorMsg = "সার্ভারে কানেক্ট করা যাচ্ছে না! ইন্টারনেট চেক করুন।");
+        setState(() => errorMsg = "গুগল সার্ভার রেসপন্স দেয়নি (কোড: ${response.statusCode})");
       }
-    } catch (_) {
-      setState(() => errorMsg = "সার্ভারে কানেক্ট করা যাচ্ছে না!");
+    } on TimeoutException {
+      setState(() => errorMsg = "কানেকশন টাইমআউট! ইন্টারনেটের গতি চেক করুন।");
+    } catch (err) {
+      setState(() => errorMsg = "কানেকশন ত্রুটি: $err");
     } finally {
       if (mounted) setState(() => isLogging = false);
     }
@@ -137,14 +133,16 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black),
             onPressed: () async {
-              if (rUser.text.isNotEmpty && rPass.text.isNotEmpty) {
+              if (rUser.text.trim().isNotEmpty && rPass.text.trim().isNotEmpty) {
                 Navigator.pop(ctx);
-                final resBody = await fetchFromGoogle(
-                  "$scriptUrl?action=reset_password&username=${Uri.encodeComponent(rUser.text.trim())}&new_password=${Uri.encodeComponent(rPass.text.trim())}"
-                );
-                if (resBody != null && mounted) {
-                  final d = jsonDecode(resBody);
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d['message'] ?? "")));
+                try {
+                  final res = await http.get(Uri.parse(
+                    "$scriptUrl?action=reset_password&username=${Uri.encodeComponent(rUser.text.trim())}&new_password=${Uri.encodeComponent(rPass.text.trim())}"
+                  )).timeout(const Duration(seconds: 15));
+                  final d = jsonDecode(res.body);
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d['message'] ?? "")));
+                } catch (_) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("পাসওয়ার্ড রিসেট করা যায়নি")));
                 }
               }
             },
@@ -187,18 +185,13 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                 child: Column(
                   mainAxisAlignment: isLightOn ? MainAxisAlignment.start : MainAxisAlignment.center,
                   children: [
-                    // বাতি ও চেইন সেকশন
+                    // বাতি, চেইন ও লোগো সুইচ
                     GestureDetector(
                       onTap: toggleLight,
-                      onVerticalDragEnd: (d) {
-                        if (d.primaryVelocity! > 100) toggleLight();
-                      },
                       child: Column(
                         children: [
                           Container(width: 4.5, height: isLightOn ? 45 : 120, color: const Color(0xFF94A3B8)),
                           Container(width: 26, height: 12, decoration: BoxDecoration(color: const Color(0xFF334155), borderRadius: BorderRadius.circular(3))),
-                          
-                          // বাল্ব
                           Container(
                             width: isLightOn ? 42 : 56,
                             height: isLightOn ? 42 : 56,
@@ -215,12 +208,8 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                             ),
                             child: Icon(Icons.lightbulb, color: isLightOn ? const Color(0xFFD97706) : Colors.amber.shade800, size: isLightOn ? 26 : 36),
                           ),
-
-                          // বাতি অফ থাকলে নিচের চেইন ও লোগো সুইচ
                           if (!isLightOn) ...[
                             Container(width: 4, height: 130, color: const Color(0xFFCBD5E1)),
-                            
-                            // লোগো সুইচ বাটন (হাতল)
                             Container(
                               width: 78,
                               height: 78,
@@ -262,7 +251,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                       ),
                     ),
 
-                    // বাতি অন হলে ফর্ম
+                    // আলো জ্বলে উঠলে লগইন ফর্ম
                     if (isLightOn) ...[
                       const SizedBox(height: 15),
                       Container(
@@ -293,6 +282,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                           controller: userCtrl,
                           decoration: InputDecoration(
                             labelText: "ইউজার নেম",
+                            hintText: "ইউজারনেম লিখুন",
                             prefixIcon: const Icon(Icons.person, color: Color(0xFFF59E0B)),
                             filled: true,
                             fillColor: const Color(0xFF121826),
@@ -309,6 +299,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                           obscureText: true,
                           decoration: InputDecoration(
                             labelText: "পাসওয়ার্ড",
+                            hintText: "পাসওয়ার্ড লিখুন",
                             prefixIcon: const Icon(Icons.lock, color: Color(0xFFF59E0B)),
                             filled: true,
                             fillColor: const Color(0xFF121826),
@@ -392,9 +383,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   Future<void> syncDatabase() async {
     setState(() => isSyncing = true);
     try {
-      final body = await fetchFromGoogle(scriptUrl);
-      if (body != null) {
-        final data = jsonDecode(body);
+      final response = await http.get(Uri.parse(scriptUrl)).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
         if (data['status'] == 'SUCCESS') {
           if (!mounted) return;
           setState(() {
@@ -409,6 +400,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
     if (mounted) setState(() => isSyncing = false);
   }
 
+  // A4 ইনভয়েস জেনারেটর
   Future<void> generateAndPrintA4Invoice(Map<String, dynamic> e) async {
     final pdf = pw.Document();
     pdf.addPage(
