@@ -6,42 +6,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-// আপনার সঠিক সক্রিয় Google Apps Script URL
 const String scriptUrl = "https://script.google.com/macros/s/AKfycbyzOUFz4Om6ZS0flZEfBTA1DfWX4DTvNmWNggVaro1mcyzkQmt1DFA0kjnKDD2ymqpY/exec";
-
-// SEWTRON অফিসিয়াল লোগো লিংক
 const String logoUrl = "https://i.ibb.co/6P0yN2B/sewtron-logo.png";
-
-// গুগল স্ক্রিপ্টের এইচটিএমএল রিডাইরেক্ট ও জেসন ফিল্টার মেথড
-Future<dynamic> requestGoogleData(String url) async {
-  final client = http.Client();
-  var uri = Uri.parse(url);
-  var response = await client.get(uri).timeout(const Duration(seconds: 25));
-
-  String bodyText = response.body.trim();
-
-  // যদি গুগল কোনো কারণে HTML বা রিডাইরেক্ট পেজ পাঠায়
-  if (bodyText.startsWith("<!DOCTYPE") || bodyText.startsWith("<html")) {
-    // হেডার রিডাইরেক্ট চেক
-    if (response.headers.containsKey('location')) {
-      final redUrl = response.headers['location']!;
-      final r2 = await client.get(Uri.parse(redUrl)).timeout(const Duration(seconds: 25));
-      bodyText = r2.body.trim();
-    } 
-    // স্ক্রিপ্টের ভেতরের লোকেশন লিংক খোঁজা
-    else if (bodyText.contains("href=\"")) {
-      final startIndex = bodyText.indexOf("href=\"") + 6;
-      final endIndex = bodyText.indexOf("\"", startIndex);
-      if (startIndex > 5 && endIndex > startIndex) {
-        final redirectUrl = bodyText.substring(startIndex, endIndex).replaceAll("&amp;", "&");
-        final r2 = await client.get(Uri.parse(redirectUrl)).timeout(const Duration(seconds: 25));
-        bodyText = r2.body.trim();
-      }
-    }
-  }
-
-  return jsonDecode(bodyText);
-}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,7 +32,7 @@ class SewtronApp extends StatelessWidget {
   }
 }
 
-// ==================== ১. লোগো-সুইচ ডিম লাইট লগইন স্ক্রিন ====================
+// ==================== ১. লগইন স্ক্রিন ====================
 class AuthenticLampLoginScreen extends StatefulWidget {
   const AuthenticLampLoginScreen({super.key});
 
@@ -97,14 +63,15 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
       return;
     }
 
-    setState(() {
-      isLogging = true;
-      errorMsg = "";
-    });
+    setState(() { isLogging = true; errorMsg = ""; });
 
     try {
-      final targetUrl = "$scriptUrl?action=login&username=${Uri.encodeComponent(inputUser)}&password=${Uri.encodeComponent(inputPass)}";
-      final data = await requestGoogleData(targetUrl);
+      final targetUri = Uri.parse(
+        "$scriptUrl?action=login&username=${Uri.encodeComponent(inputUser)}&password=${Uri.encodeComponent(inputPass)}"
+      );
+
+      final response = await http.get(targetUri).timeout(const Duration(seconds: 20));
+      final data = jsonDecode(response.body);
 
       if (data['status'] == 'SUCCESS') {
         if (!mounted) return;
@@ -117,63 +84,19 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
             ),
           ),
         );
-        return;
       } else {
         setState(() => errorMsg = data['message'] ?? "ইউজারনেম বা পাসওয়ার্ড সঠিক নয়!");
       }
-    } on TimeoutException {
-      setState(() => errorMsg = "টাইমআউট! সার্ভার সাড়া দিচ্ছে না, ইন্টারনেট চেক করুন।");
     } catch (err) {
-      setState(() => errorMsg = "লগইন তথ্য সঠিক দিন অথবা পারমিশন চেক করুন। ($err)");
+      setState(() => errorMsg = "কানেকশন এরর: $err");
     } finally {
       if (mounted) setState(() => isLogging = false);
     }
   }
 
-  void openResetDialog() {
-    final rUser = TextEditingController();
-    final rPass = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF161F30),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("পাসওয়ার্ড রিসেট", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: rUser, decoration: const InputDecoration(labelText: "ইউজারনেম", border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            TextField(controller: rPass, obscureText: true, decoration: const InputDecoration(labelText: "নতুন পাসওয়ার্ড", border: OutlineInputBorder())),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("বাতিল")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black),
-            onPressed: () async {
-              if (rUser.text.trim().isNotEmpty && rPass.text.trim().isNotEmpty) {
-                Navigator.pop(ctx);
-                try {
-                  final targetUrl = "$scriptUrl?action=reset_password&username=${Uri.encodeComponent(rUser.text.trim())}&new_password=${Uri.encodeComponent(rPass.text.trim())}";
-                  final d = await requestGoogleData(targetUrl);
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d['message'] ?? "")));
-                } catch (_) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("পাসওয়ার্ড রিসেট করা যায়নি")));
-                }
-              }
-            },
-            child: const Text("সংরক্ষণ", style: TextStyle(fontWeight: FontWeight.bold)),
-          )
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenH = MediaQuery.of(context).size.height;
-
     return Scaffold(
       body: Stack(
         children: [
@@ -193,16 +116,13 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                 ),
               ),
             ),
-
           SafeArea(
             child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: screenH - 50),
                 child: Column(
                   mainAxisAlignment: isLightOn ? MainAxisAlignment.start : MainAxisAlignment.center,
                   children: [
-                    // বাতি ও চেইন সেকশন
                     GestureDetector(
                       onTap: toggleLight,
                       child: Column(
@@ -235,39 +155,17 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                                 shape: BoxShape.circle,
                                 color: Colors.white,
                                 border: Border.all(color: const Color(0xFFF59E0B), width: 4),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFF59E0B).withOpacity(0.5),
-                                    blurRadius: 20,
-                                    spreadRadius: 4,
-                                  )
-                                ],
+                                boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.5), blurRadius: 20, spreadRadius: 4)],
                               ),
-                              child: ClipOval(
-                                child: Image.network(
-                                  logoUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.touch_app, size: 40, color: Color(0xFF1E3A8A)),
-                                ),
-                              ),
+                              child: ClipOval(child: Image.network(logoUrl, fit: BoxFit.cover)),
                             ),
                             const SizedBox(height: 8),
                             const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFFF59E0B), size: 28),
-                            const SizedBox(height: 6),
-                            const Text(
-                              "লোগো সুইচে টাচ করুন বা নিচে টান দিন",
-                              style: TextStyle(color: Color(0xFFFCD34D), fontSize: 15, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              "আলো জ্বলে উঠলে SEWTRON ইন্টারফেস উন্মোচিত হবে",
-                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                            ),
+                            const Text("লোগো সুইচে টাচ করুন বা নিচে টান দিন", style: TextStyle(color: Color(0xFFFCD34D), fontSize: 15, fontWeight: FontWeight.bold)),
                           ],
                         ],
                       ),
                     ),
-
                     if (isLightOn) ...[
                       const SizedBox(height: 15),
                       Container(
@@ -277,96 +175,40 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                           shape: BoxShape.circle,
                           color: Colors.white,
                           border: Border.all(color: const Color(0xFFF59E0B), width: 3),
-                          boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.4), blurRadius: 18, spreadRadius: 3)],
                         ),
-                        child: ClipOval(
-                          child: Image.network(
-                            logoUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.settings, size: 50, color: Color(0xFF1E3A8A)),
-                          ),
-                        ),
+                        child: ClipOval(child: Image.network(logoUrl, fit: BoxFit.cover)),
                       ),
                       const SizedBox(height: 12),
-                      const Text("SEWTRON ENGINEERING", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.8)),
-                      const Text("Industrial Electronics & Control", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                      const Text("SEWTRON ENGINEERING", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                       const SizedBox(height: 24),
-
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 28),
-                        child: TextField(
-                          controller: userCtrl,
-                          decoration: InputDecoration(
-                            labelText: "ইউজার নেম",
-                            hintText: "ইউজারনেম লিখুন",
-                            prefixIcon: const Icon(Icons.person, color: Color(0xFFF59E0B)),
-                            filled: true,
-                            fillColor: const Color(0xFF121826),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2D3748))),
-                          ),
-                        ),
+                        child: TextField(controller: userCtrl, decoration: const InputDecoration(labelText: "ইউজার নেম", border: OutlineInputBorder())),
                       ),
                       const SizedBox(height: 14),
-
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 28),
-                        child: TextField(
-                          controller: passCtrl,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: "পাসওয়ার্ড",
-                            hintText: "পাসওয়ার্ড লিখুন",
-                            prefixIcon: const Icon(Icons.lock, color: Color(0xFFF59E0B)),
-                            filled: true,
-                            fillColor: const Color(0xFF121826),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2D3748))),
-                          ),
-                        ),
+                        child: TextField(controller: passCtrl, obscureText: true, decoration: const InputDecoration(labelText: "পাসওয়ার্ড", border: OutlineInputBorder())),
                       ),
-
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8, bottom: 12),
-                        child: TextButton(
-                          onPressed: openResetDialog,
-                          child: const Text("Forgot Password? (Reset Password)", style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 13)),
-                        ),
-                      ),
-
-                      if (errorMsg.isNotEmpty) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Text(errorMsg, textAlign: TextAlign.center, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-
+                      const SizedBox(height: 14),
+                      if (errorMsg.isNotEmpty) Text(errorMsg, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 28),
                         child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF59E0B),
-                            foregroundColor: const Color(0xFF0F172A),
-                            minimumSize: const Size.fromHeight(50),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black, minimumSize: const Size.fromHeight(50)),
                           onPressed: isLogging ? null : handleLogin,
-                          child: isLogging
-                              ? const CircularProgressIndicator(color: Colors.black)
-                              : const Text("LOGIN (লগইন করুন)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          child: isLogging ? const CircularProgressIndicator(color: Colors.black) : const Text("LOGIN (লগইন করুন)", style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                       const SizedBox(height: 15),
-                      TextButton(
-                        onPressed: toggleLight,
-                        child: const Text("💡 লাইট অফ করুন", style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+                      TextButton(onPressed: toggleLight, child: const Text("💡 লাইট অফ করুন", style: TextStyle(color: Color(0xFF64748B)))),
+                    ]
                   ],
                 ),
               ),
             ),
-          ),
+          )
         ],
       ),
     );
@@ -399,7 +241,8 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   Future<void> syncDatabase() async {
     setState(() => isSyncing = true);
     try {
-      final data = await requestGoogleData(scriptUrl);
+      final res = await http.get(Uri.parse(scriptUrl)).timeout(const Duration(seconds: 15));
+      final data = jsonDecode(res.body);
       if (data['status'] == 'SUCCESS') {
         if (!mounted) return;
         setState(() {
@@ -413,67 +256,161 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
     if (mounted) setState(() => isSyncing = false);
   }
 
-  // A4 ইনভয়েস জেনারেটর
-  Future<void> generateAndPrintA4Invoice(Map<String, dynamic> e) async {
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (pw.Context ctx) {
-          return pw.Container(
-            padding: const pw.EdgeInsets.all(16),
-            decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blue900, width: 2)),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text("SEWTRON ENGINEERING", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                pw.Text("BILL INVOICE / QUOTATION", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blue700)),
-                pw.Text("Garments Machinery, Automation & Precision Spare Parts", style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-                pw.Divider(thickness: 1.5, color: PdfColors.blue900),
-                pw.SizedBox(height: 8),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text("Customer Name : ${e['name']}", style: const pw.TextStyle(fontSize: 10)),
-                    pw.Text("Invoice No : ${e['inv']}", style: const pw.TextStyle(fontSize: 10)),
-                  ],
-                ),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text("Date : ${e['date']}", style: const pw.TextStyle(fontSize: 10)),
-                    pw.Text("Prepared By : ${e['addedBy'] ?? widget.user}", style: const pw.TextStyle(fontSize: 10)),
-                  ],
-                ),
-                pw.SizedBox(height: 14),
-                pw.TableHelper.fromTextArray(
-                  border: pw.TableBorder.all(color: PdfColors.grey300),
-                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9),
-                  headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
-                  cellHeight: 24,
-                  headers: ['SL', 'Item Description', 'Unit', 'Qty', 'Unit Price', 'Total (BDT)'],
-                  data: [
-                    ['1', e['remarks'] != "" ? e['remarks'] : "Industrial Spare Parts", 'Pcs', '1', "${e['bill']}.00", "${e['bill']}.00"],
-                  ],
-                ),
-                pw.Spacer(),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text("Customer Acceptance (Sign & Seal)", style: const pw.TextStyle(fontSize: 8)),
-                    pw.Text("Authorized Signature (SEWTRON)", style: const pw.TextStyle(fontSize: 8)),
-                  ],
-                ),
-              ],
+  // --- ২ নম্বর মডিউল: কাস্টমার ডিউ স্টেটমেন্ট ডায়ালগ ---
+  void openStatementDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161F30),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.85,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const Text("2nd - Customer Statement & Due Ledger", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFFA78BFA))),
+            const Divider(color: Color(0xFF334155), height: 20),
+            Expanded(
+              child: customerList.isEmpty
+                  ? const Center(child: Text("কোনো কাস্টমার স্টেটমেন্ট পাওয়া যায়নি"))
+                  : ListView.builder(
+                      itemCount: customerList.length,
+                      itemBuilder: (cCtx, i) {
+                        final c = customerList[i];
+                        return Card(
+                          color: const Color(0xFF0F172A),
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Color(0xFF2D3748))),
+                          child: ExpansionTile(
+                            title: Text(c['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15)),
+                            subtitle: Text("মোট বিল: ৳${c['billed']} | জমা: ৳${c['paid']} | বকেয়া: ৳${c['due']}",
+                                style: TextStyle(color: (c['due'] > 0) ? const Color(0xFFF87171) : Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                color: const Color(0xFF161F30),
+                                child: Column(
+                                  children: [
+                                    ...(c['history'] as List<dynamic>).map((h) => Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text("${h['date']} | ${h['inv']}", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                          Text("বিল: ৳${h['bill']} (বাকি: ৳${h['due']})", style: const TextStyle(fontSize: 11, color: Colors.white)),
+                                        ],
+                                      ),
+                                    )),
+                                  ],
+                                ),
+                              )
+                            ],
+                          ),
+                        );
+                      },
+                    ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
+  // --- ৩ নম্বর মডিউল: টোটাল সামারি লাইভ ডায়ালগ ---
+  void openTotalSummaryDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161F30),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("3rd - Total Summary (সারসংক্ষেপ)", style: TextStyle(color: Color(0xFFF87171), fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(title: const Text("সর্বমোট কাজের বিল"), trailing: Text("৳ ${summary['totalBill']}", style: const TextStyle(color: Colors.lightBlue, fontWeight: FontWeight.bold, fontSize: 15))),
+            ListTile(title: const Text("সর্বমোট আদায়"), trailing: Text("৳ ${summary['totalPaid']}", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 15))),
+            ListTile(title: const Text("সর্বমোট বকেয়া (Due)"), trailing: Text("৳ ${summary['totalDue']}", style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16))),
+            ListTile(title: const Text("মোট মালামাল ক্রয়"), trailing: Text("৳ ${summary['actualCost']}", style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15))),
+            ListTile(title: const Text("মোট সক্রিয় ক্লায়েন্ট"), trailing: Text("${summary['customers']} জন", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("ঠিক আছে", style: TextStyle(color: Color(0xFFF59E0B)))),
+        ],
+      ),
+    );
+  }
+
+  // --- ৫ নম্বর মডিউল: ইউজার প্রোফাইল ও নতুন ইউজার অ্যাড ---
+  void openUserProfileDialog() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161F30),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        final newNameCtrl = TextEditingController();
+        final newPassCtrl = TextEditingController();
+        String selectedRole = "Staff";
+
+        return StatefulBuilder(
+          builder: (bCtx, setDialogState) => Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(bCtx).viewInsets.bottom + 20, left: 16, right: 16, top: 16),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("5th - User Profiles & Staff Management", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF34D399))),
+                  const Divider(color: Color(0xFF334155), height: 16),
+                  Text("বর্তমান লগইন: ${widget.user} (${widget.role})", style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  const SizedBox(height: 16),
+                  const Text("নতুন ইউজার তৈরি করুন:", style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  TextField(controller: newNameCtrl, decoration: const InputDecoration(labelText: "ইউজার নেম", border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  TextField(controller: newPassCtrl, obscureText: true, decoration: const InputDecoration(labelText: "পাসওয়ার্ড", border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    decoration: const InputDecoration(labelText: "পদবী (Role)", border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: "Admin", child: Text("Admin")),
+                      DropdownMenuItem(value: "Staff", child: Text("Staff")),
+                    ],
+                    onChanged: (v) => setDialogState(() => selectedRole = v!),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF34D399), foregroundColor: Colors.black, minimumSize: const Size.fromHeight(48)),
+                    onPressed: () async {
+                      if (newNameCtrl.text.isNotEmpty && newPassCtrl.text.isNotEmpty) {
+                        Navigator.pop(ctx);
+                        await http.post(
+                          Uri.parse(scriptUrl),
+                          headers: {"Content-Type": "application/json"},
+                          body: jsonEncode({
+                            "action": "add_user",
+                            "name": newNameCtrl.text.trim(),
+                            "password": newPassCtrl.text.trim(),
+                            "role": selectedRole,
+                          }),
+                        );
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("নতুন ইউজার সফলভাবে যোগ করা হয়েছে!")));
+                      }
+                    },
+                    child: const Text("নতুন ইউজার সেভ করুন", style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- ১ নম্বর মডিউল: নতুন বিল ডাটা এন্ট্রি ---
   void openAddBillDialog() {
     final nameCtrl = TextEditingController();
     final invCtrl = TextEditingController();
@@ -538,6 +475,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
     );
   }
 
+  // --- ৪ নম্বর মডিউল: একচুয়াল কস্ট ম্যানুয়াল এন্ট্রি ---
   void openAddCostDialog() {
     final sName = TextEditingController();
     final chNo = TextEditingController();
@@ -600,6 +538,67 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
         ),
       ),
     );
+  }
+
+  // --- A4 ইনভয়েস জেনারেটর ---
+  Future<void> generateAndPrintA4Invoice(Map<String, dynamic> e) async {
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context ctx) {
+          return pw.Container(
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blue900, width: 2)),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text("SEWTRON ENGINEERING", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                pw.Text("BILL INVOICE / QUOTATION", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blue700)),
+                pw.Text("Garments Machinery, Automation & Precision Spare Parts", style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                pw.Divider(thickness: 1.5, color: PdfColors.blue900),
+                pw.SizedBox(height: 8),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text("Customer Name : ${e['name']}", style: const pw.TextStyle(fontSize: 10)),
+                    pw.Text("Invoice No : ${e['inv']}", style: const pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text("Date : ${e['date']}", style: const pw.TextStyle(fontSize: 10)),
+                    pw.Text("Prepared By : ${e['addedBy'] ?? widget.user}", style: const pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+                pw.SizedBox(height: 14),
+                pw.TableHelper.fromTextArray(
+                  border: pw.TableBorder.all(color: PdfColors.grey300),
+                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9),
+                  headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
+                  cellHeight: 24,
+                  headers: ['SL', 'Item Description', 'Unit', 'Qty', 'Unit Price', 'Total (BDT)'],
+                  data: [
+                    ['1', e['remarks'] != "" ? e['remarks'] : "Industrial Spare Parts", 'Pcs', '1', "${e['bill']}.00", "${e['bill']}.00"],
+                  ],
+                ),
+                pw.Spacer(),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text("Customer Acceptance (Sign & Seal)", style: const pw.TextStyle(fontSize: 8)),
+                    pw.Text("Authorized Signature (SEWTRON)", style: const pw.TextStyle(fontSize: 8)),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
   @override
@@ -675,11 +674,14 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                 const SizedBox(height: 18),
                 const Text("BUSINESS MODULES:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
                 const SizedBox(height: 8),
+
+                // ৫টি মডিউল এখন সম্পূর্ণ ক্লিকযোগ্য
                 moduleCard("1st", "Data Entry", "Daily Bill & Collection (New Entry)", "ENTRY", const Color(0xFF38BDF8), openAddBillDialog),
-                moduleCard("2nd", "Statement", "Customer Statement (Auto-Generated)", "AUTO", const Color(0xFFA78BFA), () {}),
-                moduleCard("3rd", "Total Summary", "All Customer Due Summary (Live)", "AUTO", const Color(0xFFF87171), () {}),
+                moduleCard("2nd", "Statement", "Customer Statement & Due Ledger", "VIEW", const Color(0xFFA78BFA), openStatementDialog),
+                moduleCard("3rd", "Total Summary", "All Customer Due Summary (Live)", "VIEW", const Color(0xFFF87171), openTotalSummaryDialog),
                 moduleCard("4th", "Actual Cost", "Component Purchase & Expense Entry", "ENTRY", const Color(0xFFFBBF24), openAddCostDialog),
-                moduleCard("5th", "User Profiles", "Admin & Staff Profiles", "EDIT", const Color(0xFF34D399), () {}),
+                moduleCard("5th", "User Profiles", "Admin & Staff Profiles (Add/Edit)", "EDIT", const Color(0xFF34D399), openUserProfileDialog),
+
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(14),
