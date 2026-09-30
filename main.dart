@@ -6,13 +6,13 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-// আপনার ডিপ্লয় করা Apps Script Web App URL
-const String scriptUrl = "https://script.google.com/macros/s/AKfycby4qreWxpaNN1AqathFv9ykjnHDjA8ACTwVYqOxNwk6hGmxDQ2stgW-wtq4MgVxabrA/exec";
+// আপনার নতুন সক্রিয় Google Apps Script Web App URL
+const String scriptUrl = "https://script.google.com/macros/s/AKfycbyzOUFz4Om6ZS0flZEfBTA1DfWX4DTvNmWNggVaro1mcyzkQmt1DFA0kjnKDD2ymqpY/exec";
 
 // SEWTRON অফিসিয়াল লোগো লিংক
 const String logoUrl = "https://i.ibb.co/6P0yN2B/sewtron-logo.png";
 
-// গুগল স্ক্রিপ্টের ৩০২ রিডাইরেক্ট হ্যান্ডলার (সার্ভার কানেক্ট নিশ্চিত করতে)
+// গুগল স্ক্রিপ্টের ৩০২ রিডাইরেক্ট হ্যান্ডলার
 Future<String?> fetchFromGoogle(String url) async {
   try {
     final client = http.Client();
@@ -162,7 +162,6 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // বাতি জ্বললে আলোর ছড়িয়ে পড়া গ্রেডিয়েন্ট
           if (isLightOn)
             Positioned.fill(
               child: Container(
@@ -196,7 +195,6 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                       },
                       child: Column(
                         children: [
-                          // ওপরের মোটা তার
                           Container(width: 4.5, height: isLightOn ? 45 : 120, color: const Color(0xFF94A3B8)),
                           Container(width: 26, height: 12, decoration: BoxDecoration(color: const Color(0xFF334155), borderRadius: BorderRadius.circular(3))),
                           
@@ -218,7 +216,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                             child: Icon(Icons.lightbulb, color: isLightOn ? const Color(0xFFD97706) : Colors.amber.shade800, size: isLightOn ? 26 : 36),
                           ),
 
-                          // বাতি বন্ধ থাকলে নিচের চেইন ও লোগো সুইচ
+                          // বাতি অফ থাকলে নিচের চেইন ও লোগো সুইচ
                           if (!isLightOn) ...[
                             Container(width: 4, height: 130, color: const Color(0xFFCBD5E1)),
                             
@@ -264,7 +262,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                       ),
                     ),
 
-                    // বাতি অন হলে মূল ইন্টারফেস
+                    // বাতি অন হলে ফর্ম
                     if (isLightOn) ...[
                       const SizedBox(height: 15),
                       Container(
