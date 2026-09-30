@@ -27,10 +27,7 @@ jobs:
           flutter create --org com.sewtron.app sewtron_app
           cd sewtron_app
           flutter pub add http pdf printing
-          
-          # অ্যান্ড্রয়েডের ইন্টারনেট পারমিশন নিশ্চিত করা
           sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
-          
           rm lib/main.dart
           cp ../main.dart lib/main.dart
           flutter build apk --release
