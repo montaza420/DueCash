@@ -12,6 +12,37 @@ const String scriptUrl = "https://script.google.com/macros/s/AKfycbyzOUFz4Om6ZS0
 // SEWTRON অফিসিয়াল লোগো লিংক
 const String logoUrl = "https://i.ibb.co/6P0yN2B/sewtron-logo.png";
 
+// গুগল স্ক্রিপ্টের এইচটিএমএল রিডাইরেক্ট ও জেসন ফিল্টার মেথড
+Future<dynamic> requestGoogleData(String url) async {
+  final client = http.Client();
+  var uri = Uri.parse(url);
+  var response = await client.get(uri).timeout(const Duration(seconds: 25));
+
+  String bodyText = response.body.trim();
+
+  // যদি গুগল কোনো কারণে HTML বা রিডাইরেক্ট পেজ পাঠায়
+  if (bodyText.startsWith("<!DOCTYPE") || bodyText.startsWith("<html")) {
+    // হেডার রিডাইরেক্ট চেক
+    if (response.headers.containsKey('location')) {
+      final redUrl = response.headers['location']!;
+      final r2 = await client.get(Uri.parse(redUrl)).timeout(const Duration(seconds: 25));
+      bodyText = r2.body.trim();
+    } 
+    // স্ক্রিপ্টের ভেতরের লোকেশন লিংক খোঁজা
+    else if (bodyText.contains("href=\"")) {
+      final startIndex = bodyText.indexOf("href=\"") + 6;
+      final endIndex = bodyText.indexOf("\"", startIndex);
+      if (startIndex > 5 && endIndex > startIndex) {
+        final redirectUrl = bodyText.substring(startIndex, endIndex).replaceAll("&amp;", "&");
+        final r2 = await client.get(Uri.parse(redirectUrl)).timeout(const Duration(seconds: 25));
+        bodyText = r2.body.trim();
+      }
+    }
+  }
+
+  return jsonDecode(bodyText);
+}
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const SewtronApp());
@@ -45,7 +76,6 @@ class AuthenticLampLoginScreen extends StatefulWidget {
 
 class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
   bool isLightOn = false;
-  // ইনপুট বক্স দুটি সম্পূর্ণ খালি (কোনো প্রি-ফিল্ড লেখা নেই)
   final TextEditingController userCtrl = TextEditingController();
   final TextEditingController passCtrl = TextEditingController();
   bool isLogging = false;
@@ -73,39 +103,28 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
     });
 
     try {
-      final targetUri = Uri.parse(
-        "$scriptUrl?action=login&username=${Uri.encodeComponent(inputUser)}&password=${Uri.encodeComponent(inputPass)}"
-      );
+      final targetUrl = "$scriptUrl?action=login&username=${Uri.encodeComponent(inputUser)}&password=${Uri.encodeComponent(inputPass)}";
+      final data = await requestGoogleData(targetUrl);
 
-      final response = await http.get(
-        targetUri,
-        headers: {"Accept": "application/json"},
-      ).timeout(const Duration(seconds: 25));
-
-      if (response.statusCode == 200 || response.statusCode == 302) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == 'SUCCESS') {
-          if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MainDashboardScreen(
-                user: data['user']['name'] ?? inputUser,
-                role: data['user']['role'] ?? "Admin",
-              ),
+      if (data['status'] == 'SUCCESS') {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MainDashboardScreen(
+              user: data['user']['name'] ?? inputUser,
+              role: data['user']['role'] ?? "Admin",
             ),
-          );
-          return;
-        } else {
-          setState(() => errorMsg = data['message'] ?? "ইউজারনেম বা পাসওয়ার্ড সঠিক নয়!");
-        }
+          ),
+        );
+        return;
       } else {
-        setState(() => errorMsg = "গুগল সার্ভার রেসপন্স দেয়নি (কোড: ${response.statusCode})");
+        setState(() => errorMsg = data['message'] ?? "ইউজারনেম বা পাসওয়ার্ড সঠিক নয়!");
       }
     } on TimeoutException {
-      setState(() => errorMsg = "কানেকশন টাইমআউট! ইন্টারনেটের গতি চেক করুন।");
+      setState(() => errorMsg = "টাইমআউট! সার্ভার সাড়া দিচ্ছে না, ইন্টারনেট চেক করুন।");
     } catch (err) {
-      setState(() => errorMsg = "কানেকশন ত্রুটি: $err");
+      setState(() => errorMsg = "লগইন তথ্য সঠিক দিন অথবা পারমিশন চেক করুন। ($err)");
     } finally {
       if (mounted) setState(() => isLogging = false);
     }
@@ -136,10 +155,8 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
               if (rUser.text.trim().isNotEmpty && rPass.text.trim().isNotEmpty) {
                 Navigator.pop(ctx);
                 try {
-                  final res = await http.get(Uri.parse(
-                    "$scriptUrl?action=reset_password&username=${Uri.encodeComponent(rUser.text.trim())}&new_password=${Uri.encodeComponent(rPass.text.trim())}"
-                  )).timeout(const Duration(seconds: 15));
-                  final d = jsonDecode(res.body);
+                  final targetUrl = "$scriptUrl?action=reset_password&username=${Uri.encodeComponent(rUser.text.trim())}&new_password=${Uri.encodeComponent(rPass.text.trim())}";
+                  final d = await requestGoogleData(targetUrl);
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d['message'] ?? "")));
                 } catch (_) {
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("পাসওয়ার্ড রিসেট করা যায়নি")));
@@ -185,7 +202,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                 child: Column(
                   mainAxisAlignment: isLightOn ? MainAxisAlignment.start : MainAxisAlignment.center,
                   children: [
-                    // বাতি, চেইন ও লোগো সুইচ
+                    // বাতি ও চেইন সেকশন
                     GestureDetector(
                       onTap: toggleLight,
                       child: Column(
@@ -251,7 +268,6 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                       ),
                     ),
 
-                    // আলো জ্বলে উঠলে লগইন ফর্ম
                     if (isLightOn) ...[
                       const SizedBox(height: 15),
                       Container(
@@ -383,18 +399,15 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   Future<void> syncDatabase() async {
     setState(() => isSyncing = true);
     try {
-      final response = await http.get(Uri.parse(scriptUrl)).timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == 'SUCCESS') {
-          if (!mounted) return;
-          setState(() {
-            summary = data['summary'];
-            allEntries = data['entries'].reversed.toList();
-            costEntries = data['costEntries'].reversed.toList();
-            customerList = data['customers'];
-          });
-        }
+      final data = await requestGoogleData(scriptUrl);
+      if (data['status'] == 'SUCCESS') {
+        if (!mounted) return;
+        setState(() {
+          summary = data['summary'];
+          allEntries = data['entries'].reversed.toList();
+          costEntries = data['costEntries'].reversed.toList();
+          customerList = data['customers'];
+        });
       }
     } catch (_) {}
     if (mounted) setState(() => isSyncing = false);
