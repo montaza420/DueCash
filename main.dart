@@ -1,0 +1,899 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
+// আপনার ডিপ্লয় করা Apps Script Web App URL
+const String scriptUrl = "https://script.google.com/macros/s/AKfycbxWfHEaEjtsZr9ahibWGY3OgBFSKW5n4KJ3RuMFQ_g-xOof5ntTySVwY9yaOMsOW0aj/exec";
+
+// SEWTRON অফিসিয়াল লোগো লিংক
+const String logoUrl = "https://i.ibb.co/6P0yN2B/sewtron-logo.png";
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const SewtronApp());
+}
+
+class SewtronApp extends StatelessWidget {
+  const SewtronApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'SEWTRON ENGINEERING',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF07070A),
+        fontFamily: 'Roboto',
+      ),
+      home: const AuthenticLampLoginScreen(),
+    );
+  }
+}
+
+// ==================== ১. লক করা ঝুলন্ত লাইট লগইন স্ক্রিন ====================
+class AuthenticLampLoginScreen extends StatefulWidget {
+  const AuthenticLampLoginScreen({super.key});
+
+  @override
+  State<AuthenticLampLoginScreen> createState() => _AuthenticLampLoginScreenState();
+}
+
+class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
+  bool isLightOn = false;
+  final TextEditingController userCtrl = TextEditingController();
+  final TextEditingController passCtrl = TextEditingController();
+  bool isLogging = false;
+  String errorMsg = "";
+
+  void toggleLight() {
+    setState(() {
+      isLightOn = !isLightOn;
+      errorMsg = "";
+    });
+  }
+
+  Future<void> handleLogin() async {
+    if (userCtrl.text.isEmpty || passCtrl.text.isEmpty) {
+      setState(() => errorMsg = "ইউজারনেম এবং পাসওয়ার্ড দিন!");
+      return;
+    }
+
+    setState(() { isLogging = true; errorMsg = ""; });
+
+    try {
+      final res = await http.get(Uri.parse(
+        "$scriptUrl?action=login&username=${Uri.encodeComponent(userCtrl.text.trim())}&password=${Uri.encodeComponent(passCtrl.text.trim())}"
+      )).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(res.body);
+      if (data['status'] == 'SUCCESS') {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MainDashboardScreen(
+              user: data['user']['name'],
+              role: data['user']['role'],
+            ),
+          ),
+        );
+      } else {
+        setState(() => errorMsg = data['message'] ?? "ইউজারনেম বা পাসওয়ার্ড সঠিক নয়!");
+      }
+    } catch (_) {
+      setState(() => errorMsg = "সার্ভারে কানেক্ট করা যাচ্ছে না!");
+    } finally {
+      if (mounted) setState(() => isLogging = false);
+    }
+  }
+
+  void openResetDialog() {
+    final rUser = TextEditingController();
+    final rPass = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161F30),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("পাসওয়ার্ড রিসেট", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: rUser, decoration: const InputDecoration(labelText: "ইউজারনেম", border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: rPass, obscureText: true, decoration: const InputDecoration(labelText: "নতুন পাসওয়ার্ড", border: OutlineInputBorder())),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("বাতিল")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black),
+            onPressed: () async {
+              if (rUser.text.isNotEmpty && rPass.text.isNotEmpty) {
+                Navigator.pop(ctx);
+                try {
+                  final res = await http.get(Uri.parse(
+                    "$scriptUrl?action=reset_password&username=${Uri.encodeComponent(rUser.text.trim())}&new_password=${Uri.encodeComponent(rPass.text.trim())}"
+                  ));
+                  final d = jsonDecode(res.body);
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d['message'] ?? "")));
+                } catch (_) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("ব্যর্থ হয়েছে!")));
+                }
+              }
+            },
+            child: const Text("সংরক্ষণ", style: TextStyle(fontWeight: FontWeight.bold)),
+          )
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          if (isLightOn)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.65),
+                    radius: 1.25,
+                    colors: [
+                      const Color(0xFFF59E0B).withOpacity(0.18),
+                      Colors.black.withOpacity(0.85),
+                      const Color(0xFF07070A),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: toggleLight,
+                    child: SizedBox(
+                      height: isLightOn ? 130 : 380,
+                      child: Stack(
+                        alignment: Alignment.topCenter,
+                        children: [
+                          Container(width: 2.5, height: isLightOn ? 70 : 220, color: const Color(0xFF64748B)),
+                          Positioned(
+                            top: isLightOn ? 65 : 215,
+                            child: Column(
+                              children: [
+                                Container(width: 18, height: 12, decoration: BoxDecoration(color: const Color(0xFF334155), borderRadius: BorderRadius.circular(3))),
+                                Container(
+                                  width: isLightOn ? 38 : 48,
+                                  height: isLightOn ? 38 : 48,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isLightOn ? const Color(0xFFFFFBEB) : const Color(0xFFFEF3C7).withOpacity(0.75),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFF59E0B).withOpacity(isLightOn ? 0.95 : 0.4),
+                                        blurRadius: isLightOn ? 45 : 22,
+                                        spreadRadius: isLightOn ? 16 : 6,
+                                      )
+                                    ],
+                                  ),
+                                  child: Icon(Icons.lightbulb, color: isLightOn ? const Color(0xFFD97706) : Colors.amber.shade700, size: isLightOn ? 25 : 32),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!isLightOn)
+                            Positioned(
+                              top: 265,
+                              right: MediaQuery.of(context).size.width / 2 - 25,
+                              child: Column(
+                                children: [
+                                  Container(width: 1.5, height: 85, color: const Color(0xFF94A3B8)),
+                                  Container(
+                                    width: 10,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF59E0B),
+                                      borderRadius: BorderRadius.circular(4),
+                                      boxShadow: [BoxShadow(color: Colors.amber.withOpacity(0.5), blurRadius: 6)],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  if (!isLightOn) ...[
+                    const SizedBox(height: 20),
+                    const Text("PULL CORD TO TURN ON LIGHT", style: TextStyle(color: Color(0xFFFCD34D), fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                    const SizedBox(height: 6),
+                    const Text("Pull the cord down to turn on light\nAuthentic Login Screen will appear", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                  ],
+
+                  if (isLightOn) ...[
+                    Container(
+                      width: 105,
+                      height: 105,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFF59E0B), width: 3),
+                        boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.4), blurRadius: 18, spreadRadius: 3)],
+                      ),
+                      child: ClipOval(
+                        child: Image.network(
+                          logoUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.settings, size: 55, color: Color(0xFF1E3A8A)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text("SEWTRON ENGINEERING", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.8)),
+                    const Text("Industrial Electronics & Control", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                    const SizedBox(height: 24),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: TextField(
+                        controller: userCtrl,
+                        decoration: InputDecoration(
+                          labelText: "User: Montaza",
+                          prefixIcon: const Icon(Icons.person, color: Color(0xFFF59E0B)),
+                          filled: true,
+                          fillColor: const Color(0xFF121826),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2D3748))),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: TextField(
+                        controller: passCtrl,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: "Pass: ............",
+                          prefixIcon: const Icon(Icons.lock, color: Color(0xFFF59E0B)),
+                          filled: true,
+                          fillColor: const Color(0xFF121826),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2D3748))),
+                        ),
+                      ),
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 12),
+                      child: TextButton(
+                        onPressed: openResetDialog,
+                        child: const Text("Forgot Password? (Reset Password)", style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ),
+
+                    if (errorMsg.isNotEmpty) ...[
+                      Text(errorMsg, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                    ],
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF59E0B),
+                          foregroundColor: const Color(0xFF0F172A),
+                          minimumSize: const Size.fromHeight(50),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: isLogging ? null : handleLogin,
+                        child: isLogging
+                            ? const CircularProgressIndicator(color: Colors.black)
+                            : const Text("LOGIN (লগইন করুন)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+                    TextButton(
+                      onPressed: toggleLight,
+                      child: const Text("Pull to Turn Off Light", style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                    )
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================== ২. লক করা ড্যাশবোর্ড ও ৫টি মডিউল ====================
+class MainDashboardScreen extends StatefulWidget {
+  final String user;
+  final String role;
+  const MainDashboardScreen({super.key, required this.user, required this.role});
+
+  @override
+  State<MainDashboardScreen> createState() => _MainDashboardScreenState();
+}
+
+class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsBindingObserver {
+  bool isSyncing = true;
+  Map<String, dynamic> summary = {"totalBill": 0, "totalPaid": 0, "totalDue": 0, "actualCost": 0, "customers": 0};
+  List<dynamic> allEntries = [];
+  List<dynamic> costEntries = [];
+  List<dynamic> customerList = [];
+  Timer? autoSyncTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    syncDatabase();
+    autoSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) => syncDatabase(silent: true));
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    autoSyncTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) syncDatabase();
+  }
+
+  Future<void> syncDatabase({bool silent = false}) async {
+    if (!silent) setState(() => isSyncing = true);
+    try {
+      final res = await http.get(Uri.parse(scriptUrl)).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['status'] == 'SUCCESS') {
+          if (!mounted) return;
+          setState(() {
+            summary = data['summary'];
+            allEntries = data['entries'].reversed.toList();
+            costEntries = data['costEntries'].reversed.toList();
+            customerList = data['customers'];
+          });
+          // অটোমেটিক ব্যাকআপ কার্যকর
+          http.get(Uri.parse("$scriptUrl?action=backup"));
+        }
+      }
+    } catch (_) {}
+    if (!silent && mounted) setState(() => isSyncing = false);
+  }
+
+  // --- A4 সাইজের ইনভয়েস প্রিন্ট ও পিডিএফ জেনারেটর ---
+  Future<void> generateAndPrintA4Invoice(Map<String, dynamic> e) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context ctx) {
+          return pw.Container(
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blue900, width: 2)),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text("SEWTRON ENGINEERING", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                        pw.Text("BILL INVOICE / QUOTATION", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blue700)),
+                        pw.Text("Garments Machinery, Automation & Precision Spare Parts", style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                        pw.Text("Email: info@sewtroneng.com | Cell: +880 1758-943515 | Dhaka, Bangladesh", style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.Divider(thickness: 1.5, color: PdfColors.blue900),
+                pw.SizedBox(height: 8),
+
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.all(8),
+                        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text("CUSTOMER INFO:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.blue900)),
+                            pw.Text("Customer Name : ${e['name']}", style: const pw.TextStyle(fontSize: 9)),
+                            pw.Text("Challan / Inv   : ${e['inv']}", style: const pw.TextStyle(fontSize: 9)),
+                            pw.Text("Date            : ${e['date']}", style: const pw.TextStyle(fontSize: 9)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    pw.SizedBox(width: 10),
+                    pw.Expanded(
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.all(8),
+                        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text("INVOICE DETAILS:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.blue900)),
+                            pw.Text("Invoice No   : ${e['inv']}", style: const pw.TextStyle(fontSize: 9)),
+                            pw.Text("Prepared By : ${e['addedBy'] ?? widget.user}", style: const pw.TextStyle(fontSize: 9)),
+                            pw.Text("Status      : ${e['due'] > 0 ? 'DUE' : 'PAID'}", style: const pw.TextStyle(fontSize: 9)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 14),
+
+                // টেবিল
+                pw.TableHelper.fromTextArray(
+                  border: pw.TableBorder.all(color: PdfColors.grey300),
+                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9),
+                  headerDecoration: const pw.BoxDecoration(color: PdfColors.blue900),
+                  cellHeight: 24,
+                  cellStyle: const pw.TextStyle(fontSize: 9),
+                  headers: ['SL', 'Item Description', 'Unit', 'Qty', 'Unit Price (BDT)', 'Total Amount (BDT)'],
+                  data: [
+                    ['1', e['remarks'] != "" ? e['remarks'] : "Industrial Spare Parts & Services", 'Pcs', '1', "${e['bill']}.00", "${e['bill']}.00"],
+                  ],
+                ),
+                pw.SizedBox(height: 12),
+
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.end,
+                  children: [
+                    pw.Container(
+                      width: 200,
+                      child: pw.Column(
+                        children: [
+                          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [pw.Text("Subtotal:", style: const pw.TextStyle(fontSize: 9)), pw.Text("BDT ${e['bill']}.00", style: const pw.TextStyle(fontSize: 9))]),
+                          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [pw.Text("Paid:", style: const pw.TextStyle(fontSize: 9)), pw.Text("BDT ${e['paid']}.00", style: const pw.TextStyle(fontSize: 9))]),
+                          pw.Divider(),
+                          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [pw.Text("TOTAL DUE:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.red900)), pw.Text("BDT ${e['due']}.00", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.red900))]),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                pw.Spacer(),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(children: [pw.Container(width: 150, child: pw.Divider(color: PdfColors.grey600)), pw.Text("Customer Acceptance (Sign & Seal)", style: const pw.TextStyle(fontSize: 8))]),
+                    pw.Column(children: [pw.Container(width: 150, child: pw.Divider(color: PdfColors.grey600)), pw.Text("Authorized Signature (SEWTRON)", style: const pw.TextStyle(fontSize: 8))]),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+  }
+
+  // --- ১. ডাটা এন্ট্রি ডায়ালগ (Data Entry) ---
+  void openAddBillDialog() {
+    final nameCtrl = TextEditingController();
+    final invCtrl = TextEditingController();
+    final billCtrl = TextEditingController();
+    final paidCtrl = TextEditingController();
+    final remCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161F30),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, left: 20, right: 20, top: 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("1st - Data Entry (নতুন বিল ও চালান)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 14),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "কাস্টমারের নাম", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: invCtrl, decoration: const InputDecoration(labelText: "চালান / ইনভয়েস নং", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: billCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "মোট বিল (৳)", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: paidCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "জমা / পেইড (৳)", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: remCtrl, decoration: const InputDecoration(labelText: "আইটেমের বিবরণ (Item Remarks)", border: OutlineInputBorder())),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8), foregroundColor: Colors.black, minimumSize: const Size.fromHeight(48)),
+                onPressed: () async {
+                  if (nameCtrl.text.isNotEmpty && billCtrl.text.isNotEmpty) {
+                    Navigator.pop(ctx);
+                    double b = double.tryParse(billCtrl.text) ?? 0;
+                    double p = double.tryParse(paidCtrl.text) ?? 0;
+                    await http.post(
+                      Uri.parse(scriptUrl),
+                      headers: {"Content-Type": "application/json"},
+                      body: jsonEncode({
+                        "action": "add_entry",
+                        "name": nameCtrl.text,
+                        "inv": invCtrl.text,
+                        "bill": b,
+                        "paid": p,
+                        "due": b - p,
+                        "remarks": remCtrl.text,
+                        "addedBy": widget.user,
+                        "date": DateTime.now().toIso8601String().substring(0, 10)
+                      }),
+                    );
+                    syncDatabase();
+                  }
+                },
+                child: const Text("সংরক্ষণ ও সিঙ্ক করুন", style: TextStyle(fontWeight: FontWeight.bold)),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- ৪. একচুয়াল কস্ট ম্যানুয়াল এন্ট্রি ডায়ালগ (Actual Cost) ---
+  void openAddCostDialog() {
+    final sName = TextEditingController();
+    final chNo = TextEditingController();
+    final desc = TextEditingController();
+    final price = TextEditingController();
+    final amt = TextEditingController();
+    final rem = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161F30),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, left: 20, right: 20, top: 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("4th - Actual Cost (পার্টস ক্রয় ও খরচ এন্ট্রি)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 14),
+              TextField(controller: sName, decoration: const InputDecoration(labelText: "সাপ্লায়ারের নাম (যেমন: Tokyo Electronics)", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: chNo, decoration: const InputDecoration(labelText: "চালান নম্বর", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: desc, decoration: const InputDecoration(labelText: "আইটেম বিবরণ (Item Description)", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "দর (Unit Price)", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: amt, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "মোট খরচ টাকা (Total Amount)", border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: rem, decoration: const InputDecoration(labelText: "মন্তব্য (যেমন: Cash / bKash)", border: OutlineInputBorder())),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFBBF24), foregroundColor: Colors.black, minimumSize: const Size.fromHeight(48)),
+                onPressed: () async {
+                  if (sName.text.isNotEmpty && amt.text.isNotEmpty) {
+                    Navigator.pop(ctx);
+                    await http.post(
+                      Uri.parse(scriptUrl),
+                      headers: {"Content-Type": "application/json"},
+                      body: jsonEncode({
+                        "action": "add_cost",
+                        "supplier": sName.text,
+                        "challan": chNo.text,
+                        "desc": desc.text,
+                        "unitPrice": price.text,
+                        "amount": amt.text,
+                        "remarks": rem.text,
+                        "date": DateTime.now().toIso8601String().substring(0, 10)
+                      }),
+                    );
+                    syncDatabase();
+                  }
+                },
+                child: const Text("খরচ সেভ করুন", style: TextStyle(fontWeight: FontWeight.bold)),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- ২. কাস্টমার স্টেটমেন্ট ভিউয়ার (Statement) ---
+  void openStatementSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161F30),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.85,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const Text("2nd - Customer Statement (লেজার)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const Divider(color: Color(0xFF334155)),
+            Expanded(
+              child: ListView.builder(
+                itemCount: customerList.length,
+                itemBuilder: (cCtx, i) {
+                  final cust = customerList[i];
+                  return Card(
+                    color: const Color(0xFF1C2541),
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(cust['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text("মোট বিল: ৳${cust['billed']}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                              Text("জমা: ৳${cust['paid']}", style: const TextStyle(color: Colors.green, fontSize: 12)),
+                              Text("বাকি: ৳${cust['due']}", style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- ৩. টোটাল সামারি ভিউয়ার (Total Summary) ---
+  void openSummarySheet() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161F30),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("3rd - Total Summary (সামারি)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(title: const Text("সর্বমোট কাজের বিল"), trailing: Text("৳ ${summary['totalBill']}", style: const TextStyle(color: Colors.lightBlue, fontWeight: FontWeight.bold))),
+            ListTile(title: const Text("সর্বমোট আদায়"), trailing: Text("৳ ${summary['totalPaid']}", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))),
+            ListTile(title: const Text("সর্বমোট বকেয়া"), trailing: Text("৳ ${summary['totalDue']}", style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold))),
+            ListTile(title: const Text("মোট মালামাল ক্রয়"), trailing: Text("৳ ${summary['actualCost']}", style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("ঠিক আছে"))],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF070A12),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80),
+        child: Container(
+          color: const Color(0xFF161F30),
+          padding: const EdgeInsets.only(top: 32, left: 14, right: 14, bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // বামে লোগো ও SEWTRON ENGINEERING
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFF59E0B), width: 2),
+                    ),
+                    child: ClipOval(
+                      child: Image.network(
+                        logoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.settings, color: Colors.blue),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("SEWTRON ENGINEERING", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                      Text("Logged: ${widget.user} (${widget.role})", style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+              // ডানে Refresh ও Logout
+              Row(
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                    onPressed: () => syncDatabase(),
+                    child: const Text("Refresh", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 6),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF334155), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                    onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthenticLampLoginScreen())),
+                    child: const Text("Logout", style: TextStyle(color: Colors.white, fontSize: 11)),
+                  )
+                ],
+              )
+            ],
+          ),
+        ),
+      ),
+      body: isSyncing
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFF59E0B)))
+          : ListView(
+              padding: const EdgeInsets.all(12),
+              children: [
+                // ৪টি কার্ড
+                Row(
+                  children: [
+                    Expanded(child: metricCard("Total Bill", "Tk ${summary['totalBill']}", const Color(0xFF38BDF8))),
+                    const SizedBox(width: 10),
+                    Expanded(child: metricCard("Total Pay", "Tk ${summary['totalPaid']}", const Color(0xFF4ADE80))),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: metricCard("Total Due", "Tk ${summary['totalDue']}", const Color(0xFFF87171))),
+                    const SizedBox(width: 10),
+                    Expanded(child: metricCard("Actual Cost", "Tk ${summary['actualCost']}", const Color(0xFFFBBF24))),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                const Text("BUSINESS MODULES:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                const SizedBox(height: 8),
+
+                // ৫টি মডিউল
+                moduleCard("1st", "Data Entry", "Daily Bill & Collection (New Entry)", "ENTRY", const Color(0xFF38BDF8), openAddBillDialog),
+                moduleCard("2nd", "Statement", "Customer Statement (Auto-Generated)", "AUTO", const Color(0xFFA78BFA), openStatementSheet),
+                moduleCard("3rd", "Total Summary", "All Customer Due Summary (Live)", "AUTO", const Color(0xFFF87171), openSummarySheet),
+                moduleCard("4th", "Actual Cost", "Component Purchase & Expense Entry", "ENTRY", const Color(0xFFFBBF24), openAddCostDialog),
+                moduleCard("5th", "User Profiles", "Admin & Staff Profiles (Editable)", "EDIT", const Color(0xFF34D399), () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("ইউজার প্রোফাইল গুগল শিটে সুরক্ষিত আছে")));
+                }),
+
+                const SizedBox(height: 16),
+                // সাম্প্রতিক বিল তালিকা + A4 Print বাটন
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161F30),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Recent Invoices (A4 Bill Print)", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8))),
+                      const Divider(height: 16, color: Color(0xFF2D3748)),
+                      ...allEntries.map((e) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(e['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFF8FAFC))),
+                                Text("Inv: ${e['inv']} | ${e['date']}", style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Text("Tk ${e['due']}", style: const TextStyle(color: Color(0xFFF87171), fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: const Icon(Icons.print, color: Color(0xFFF59E0B), size: 20),
+                                  onPressed: () => generateAndPrintA4Invoice(e),
+                                )
+                              ],
+                            )
+                          ],
+                        ),
+                      )),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(color: const Color(0xFF121826), borderRadius: BorderRadius.circular(10)),
+                    child: const Text("Cloud Auto-Backup Active | Tap Refresh to Sync", style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                  ),
+                )
+              ],
+            ),
+    );
+  }
+
+  Widget moduleCard(String num, String title, String desc, String tag, Color col, VoidCallback onTap) {
+    return Card(
+      color: const Color(0xFF161F30),
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFF2D3748))),
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: col, width: 2), color: const Color(0xFF0F172A)),
+          child: Text(num, style: TextStyle(fontWeight: FontWeight.bold, color: col, fontSize: 11)),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
+        subtitle: Text(desc, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5)),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(6)),
+          child: Text(tag, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 10)),
+        ),
+      ),
+    );
+  }
+
+  Widget metricCard(String title, String val, Color c) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161F30),
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: c, width: 4.5)),
+      ),
+      child: Column(
+        children: [
+          Text(title, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text(val, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c)),
+        ],
+      ),
+    );
+  }
+}
