@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+// আপনার ডিপ্লয় করা Apps Script Web App URL
 const String scriptUrl = "https://script.google.com/macros/s/AKfycbyzOUFz4Om6ZS0flZEfBTA1DfWX4DTvNmWNggVaro1mcyzkQmt1DFA0kjnKDD2ymqpY/exec";
 const String logoUrl = "https://i.ibb.co/6P0yN2B/sewtron-logo.png";
 
@@ -24,7 +25,7 @@ class SewtronApp extends StatelessWidget {
       title: 'SEWTRON ENGINEERING',
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF030712),
+        scaffoldBackgroundColor: const Color(0xFF020617),
         fontFamily: 'Roboto',
       ),
       home: const AuthenticLampLoginScreen(),
@@ -32,7 +33,7 @@ class SewtronApp extends StatelessWidget {
   }
 }
 
-// ==================== ১. অপটিমাইজড ফাস্ট লগইন স্ক্রিন ====================
+// ==================== ১. অপটিমাইজড ফাস্ট ডিম লাইট লগইন স্ক্রিন ====================
 class AuthenticLampLoginScreen extends StatefulWidget {
   const AuthenticLampLoginScreen({super.key});
 
@@ -54,7 +55,6 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
     });
   }
 
-  // ফাস্ট ট্র্যাকিং লগইন (সরাসরি ১-২ সেকেন্ডে রেসপন্স পাবে)
   Future<void> handleLogin() async {
     final u = userCtrl.text.trim();
     final p = passCtrl.text.trim();
@@ -71,11 +71,10 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
         "$scriptUrl?action=login&username=${Uri.encodeComponent(u)}&password=${Uri.encodeComponent(p)}"
       );
 
-      // ক্লায়েন্ট রিকোয়েস্টে রিডাইরেক্ট দ্রুত সমাধান ও ৪০ সেকেন্ড সেফটি বাফার
       final response = await http.get(
         targetUri,
-        headers: {"Accept": "application/json", "Connection": "keep-alive"},
-      ).timeout(const Duration(seconds: 40));
+        headers: {"Accept": "application/json"},
+      ).timeout(const Duration(seconds: 25));
 
       final data = jsonDecode(response.body);
 
@@ -84,7 +83,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => ModernDashboardScreen(
+            builder: (_) => MasterDashboardScreen(
               user: data['user']['name'] ?? u,
               role: data['user']['role'] ?? "Admin",
             ),
@@ -93,8 +92,6 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
       } else {
         setState(() => errorMsg = data['message'] ?? "ইউজারনেম বা পাসওয়ার্ড সঠিক নয়!");
       }
-    } on TimeoutException {
-      setState(() => errorMsg = "নেটওয়ার্ক টাইমআউট! ইন্টারনেটের গতি চেক করে আবার চেষ্টা করুন।");
     } catch (err) {
       setState(() => errorMsg = "কানেকশন এরর: $err");
     } finally {
@@ -118,7 +115,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
                     colors: [
                       const Color(0xFFF59E0B).withOpacity(0.18),
                       Colors.black.withOpacity(0.85),
-                      const Color(0xFF030712),
+                      const Color(0xFF020617),
                     ],
                   ),
                 ),
@@ -228,17 +225,17 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
   }
 }
 
-// ==================== ২. প্রিমিয়াম বিজনেস ড্যাশবোর্ড ====================
-class ModernDashboardScreen extends StatefulWidget {
+// ==================== ২. প্রিমিয়াম বিজনেস ড্যাশবোর্ড (হুবহু UI) ====================
+class MasterDashboardScreen extends StatefulWidget {
   final String user;
   final String role;
-  const ModernDashboardScreen({super.key, required this.user, required this.role});
+  const MasterDashboardScreen({super.key, required this.user, required this.role});
 
   @override
-  State<ModernDashboardScreen> createState() => _ModernDashboardScreenState();
+  State<MasterDashboardScreen> createState() => _MasterDashboardScreenState();
 }
 
-class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
+class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   bool isSyncing = true;
   Map<String, dynamic> summary = {"totalBill": 0, "totalPaid": 0, "totalDue": 0, "actualCost": 0, "customers": 0};
   List<dynamic> allEntries = [];
@@ -269,7 +266,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     if (mounted) setState(() => isSyncing = false);
   }
 
-  // --- অ্যাডমিন এডিট ডায়ালগ ---
+  // --- অ্যাডমিন এডিট মেথড ---
   void openEditEntryDialog(Map<String, dynamic> e) {
     final nameCtrl = TextEditingController(text: e['name']);
     final billCtrl = TextEditingController(text: e['bill'].toString());
@@ -300,18 +297,16 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8), foregroundColor: Colors.black),
             onPressed: () async {
               Navigator.pop(ctx);
-              await http.post(
-                Uri.parse(scriptUrl),
-                headers: {"Content-Type": "application/json"},
-                body: jsonEncode({
-                  "action": "edit_entry",
-                  "rowIndex": e['rowIndex'],
-                  "name": nameCtrl.text,
-                  "bill": double.tryParse(billCtrl.text) ?? 0,
-                  "paid": double.tryParse(paidCtrl.text) ?? 0,
-                  "remarks": remCtrl.text
-                }),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("আপডেট করা হচ্ছে...")));
+              
+              final editUrl = "$scriptUrl?action=edit_entry"
+                  "&rowIndex=${e['rowIndex']}"
+                  "&name=${Uri.encodeComponent(nameCtrl.text.trim())}"
+                  "&bill=${Uri.encodeComponent(billCtrl.text.trim())}"
+                  "&paid=${Uri.encodeComponent(paidCtrl.text.trim())}"
+                  "&remarks=${Uri.encodeComponent(remCtrl.text.trim())}";
+
+              await http.get(Uri.parse(editUrl));
               syncDatabase();
             },
             child: const Text("আপডেট করুন", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -321,7 +316,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     );
   }
 
-  // --- অ্যাডমিন ডিলিট ডায়ালগ ---
+  // --- অ্যাডমিন ডিলিট মেথড ---
   void confirmDeleteEntry(Map<String, dynamic> e) {
     showDialog(
       context: context,
@@ -335,11 +330,10 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () async {
               Navigator.pop(ctx);
-              await http.post(
-                Uri.parse(scriptUrl),
-                headers: {"Content-Type": "application/json"},
-                body: jsonEncode({"action": "delete_entry", "rowIndex": e['rowIndex']}),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("মুছে ফেলা হচ্ছে...")));
+              
+              final delUrl = "$scriptUrl?action=delete_entry&rowIndex=${e['rowIndex']}";
+              await http.get(Uri.parse(delUrl));
               syncDatabase();
             },
             child: const Text("হ্যাঁ, ডিলিট করুন"),
@@ -349,7 +343,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     );
   }
 
-  // --- A4 ইনভয়েস জেনারেটর ---
+  // --- অফিসিয়াল A4 ইনভয়েস জেনারেটর ---
   Future<void> generateAndPrintA4Invoice(Map<String, dynamic> e) async {
     final pdf = pw.Document();
     pdf.addPage(
@@ -467,7 +461,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
-  // --- ২য় মডিউল: স্টেটমেন্ট ডায়ালগ ---
+  // --- ২য় মডিউল: কাস্টমার ডিউ স্টেটমেন্ট ---
   void openStatementDialog() {
     showModalBottomSheet(
       context: context,
@@ -598,17 +592,15 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                     onPressed: () async {
                       if (newNameCtrl.text.isNotEmpty && newPassCtrl.text.isNotEmpty) {
                         Navigator.pop(ctx);
-                        await http.post(
-                          Uri.parse(scriptUrl),
-                          headers: {"Content-Type": "application/json"},
-                          body: jsonEncode({
-                            "action": "add_user",
-                            "name": newNameCtrl.text.trim(),
-                            "password": newPassCtrl.text.trim(),
-                            "role": selectedRole,
-                          }),
-                        );
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("নতুন স্টাফ সিরিয়াল অনুযায়ী সেভ হয়েছে!")));
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("স্টাফ যুক্ত করা হচ্ছে...")));
+                        
+                        final addUserUrl = "$scriptUrl?action=add_user"
+                            "&name=${Uri.encodeComponent(newNameCtrl.text.trim())}"
+                            "&password=${Uri.encodeComponent(newPassCtrl.text.trim())}"
+                            "&role=${Uri.encodeComponent(selectedRole)}";
+
+                        await http.get(Uri.parse(addUserUrl));
+                        syncDatabase();
                       }
                     },
                     child: const Text("নতুন স্টাফ সেভ করুন", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -667,26 +659,29 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                 onPressed: () async {
                   if (nameCtrl.text.isNotEmpty && billCtrl.text.isNotEmpty) {
                     Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("গুগল শিটে ডাটা পাঠানো হচ্ছে...")));
+                    
                     double b = double.tryParse(billCtrl.text) ?? 0;
                     double p = double.tryParse(paidCtrl.text) ?? 0;
-                    await http.post(
-                      Uri.parse(scriptUrl),
-                      headers: {"Content-Type": "application/json"},
-                      body: jsonEncode({
-                        "action": "add_entry",
-                        "name": nameCtrl.text,
-                        "inv": invCtrl.text,
-                        "bill": b,
-                        "paid": p,
-                        "due": b - p,
-                        "remarks": remCtrl.text,
-                        "addedBy": widget.user,
-                        "attention": attCtrl.text,
-                        "address": addCtrl.text,
-                        "mobile": mobCtrl.text,
-                        "date": DateTime.now().toIso8601String().substring(0, 10)
-                      }),
-                    );
+                    
+                    final addUrl = "$scriptUrl?action=add_entry"
+                        "&name=${Uri.encodeComponent(nameCtrl.text.trim())}"
+                        "&inv=${Uri.encodeComponent(invCtrl.text.trim())}"
+                        "&bill=$b"
+                        "&paid=$p"
+                        "&due=${b - p}"
+                        "&remarks=${Uri.encodeComponent(remCtrl.text.trim())}"
+                        "&addedBy=${Uri.encodeComponent(widget.user)}"
+                        "&attention=${Uri.encodeComponent(attCtrl.text.trim())}"
+                        "&address=${Uri.encodeComponent(addCtrl.text.trim())}"
+                        "&mobile=${Uri.encodeComponent(mobCtrl.text.trim())}"
+                        "&date=${DateTime.now().toIso8601String().substring(0, 10)}";
+
+                    final res = await http.get(Uri.parse(addUrl));
+                    final d = jsonDecode(res.body);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d['message'] ?? "সংরক্ষিত হয়েছে!")));
+                    }
                     syncDatabase();
                   }
                 },
@@ -738,20 +733,22 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                 onPressed: () async {
                   if (sName.text.isNotEmpty && amt.text.isNotEmpty) {
                     Navigator.pop(ctx);
-                    await http.post(
-                      Uri.parse(scriptUrl),
-                      headers: {"Content-Type": "application/json"},
-                      body: jsonEncode({
-                        "action": "add_cost",
-                        "supplier": sName.text,
-                        "challan": chNo.text,
-                        "desc": desc.text,
-                        "unitPrice": price.text,
-                        "amount": amt.text,
-                        "remarks": rem.text,
-                        "date": DateTime.now().toIso8601String().substring(0, 10)
-                      }),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("খরচ সেভ করা হচ্ছে...")));
+
+                    final costUrl = "$scriptUrl?action=add_cost"
+                        "&supplier=${Uri.encodeComponent(sName.text.trim())}"
+                        "&challan=${Uri.encodeComponent(chNo.text.trim())}"
+                        "&desc=${Uri.encodeComponent(desc.text.trim())}"
+                        "&unitPrice=${Uri.encodeComponent(price.text.trim())}"
+                        "&amount=${Uri.encodeComponent(amt.text.trim())}"
+                        "&remarks=${Uri.encodeComponent(rem.text.trim())}"
+                        "&date=${DateTime.now().toIso8601String().substring(0, 10)}";
+
+                    final res = await http.get(Uri.parse(costUrl));
+                    final d = jsonDecode(res.body);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d['message'] ?? "খরচ সেভ হয়েছে!")));
+                    }
                     syncDatabase();
                   }
                 },
@@ -828,6 +825,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
           : ListView(
               padding: const EdgeInsets.all(12),
               children: [
+                // ৪টি প্রিমিয়াম ট্রেন্ডিং কার্ড গ্রিড
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -843,7 +841,10 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 18),
+
+                // বিজনেস মডিউল হেডার
                 Row(
+                  mainAxisAlignment:标志Between,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text("Business Modules", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -856,6 +857,8 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
+
+                // মডিউল গ্রিড (২ কলাম)
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -873,6 +876,8 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 18),
+
+                // Recent Invoices সেকশন (ফুল একশন টেবিল)
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF1E293B))),
@@ -957,6 +962,8 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
+
+                // Quick Actions প্যানেল (৬টি রঙিন বাটন)
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF1E293B))),
@@ -993,6 +1000,8 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 25),
+
+                // নিচের ফুটার ব্র্যান্ডিং
                 const Center(
                   child: Text("SEWTRON ENGINEERING  |  Business Management System", style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
                 ),
@@ -1002,6 +1011,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     );
   }
 
+  // --- উইজেট: প্রিমিয়াম গ্লোয়িং ট্রেন্ড কার্ড ---
   Widget modernGlowCard(String title, String val, String trend, Color bg, Color accent, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1009,7 +1019,11 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: accent.withOpacity(0.3), width: 1.2),
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [bg.withOpacity(0.4), const Color(0xFF0F172A)]),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [bg.withOpacity(0.4), const Color(0xFF0F172A)],
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1018,8 +1032,16 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: accent.withOpacity(0.2), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: accent, size: 18)),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: accent.withOpacity(0.15), borderRadius: BorderRadius.circular(4)), child: Text(trend, style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.bold))),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(color: accent.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: accent, size: 18),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: accent.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                child: Text(trend, style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.bold)),
+              )
             ],
           ),
           Column(
@@ -1035,6 +1057,7 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     );
   }
 
+  // --- উইজেট: বিজনেস মডিউল বাটন কার্ড ---
   Widget moduleButtonCard(String num, String title, String sub, Color col, IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -1053,8 +1076,16 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: col.withOpacity(0.25), borderRadius: BorderRadius.circular(6)), child: Icon(icon, color: col, size: 16)),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5), decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(4)), child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(color: col.withOpacity(0.25), borderRadius: BorderRadius.circular(6)),
+                  child: Icon(icon, color: col, size: 16),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(4)),
+                  child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                )
               ],
             ),
             Column(
@@ -1070,9 +1101,15 @@ class _ModernDashboardScreenState extends State<ModernDashboardScreen> {
     );
   }
 
+  // --- উইজেট: কুইক অ্যাকশন বাটন ---
   Widget quickActionButton(String title, IconData icon, Color col, VoidCallback onTap) {
     return ElevatedButton(
-      style: ElevatedButton.styleFrom(backgroundColor: col, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: col,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
       onPressed: onTap,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
