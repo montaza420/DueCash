@@ -6,7 +6,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-// আপনার ডিপ্লয় করা Apps Script Web App URL
 const String scriptUrl = "https://script.google.com/macros/s/AKfycbyzOUFz4Om6ZS0flZEfBTA1DfWX4DTvNmWNggVaro1mcyzkQmt1DFA0kjnKDD2ymqpY/exec";
 const String logoUrl = "https://i.ibb.co/6P0yN2B/sewtron-logo.png";
 
@@ -225,7 +224,7 @@ class _AuthenticLampLoginScreenState extends State<AuthenticLampLoginScreen> {
   }
 }
 
-// ==================== ২. প্রিমিয়াম বিজনেস ড্যাশবোর্ড (হুবহু UI) ====================
+// ==================== ২. প্রিমিয়াম বিজনেস ড্যাশবোর্ড ====================
 class MasterDashboardScreen extends StatefulWidget {
   final String user;
   final String role;
@@ -266,7 +265,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     if (mounted) setState(() => isSyncing = false);
   }
 
-  // --- অ্যাডমিন এডিট মেথড ---
   void openEditEntryDialog(Map<String, dynamic> e) {
     final nameCtrl = TextEditingController(text: e['name']);
     final billCtrl = TextEditingController(text: e['bill'].toString());
@@ -316,7 +314,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- অ্যাডমিন ডিলিট মেথড ---
   void confirmDeleteEntry(Map<String, dynamic> e) {
     showDialog(
       context: context,
@@ -343,7 +340,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- অফিসিয়াল A4 ইনভয়েস জেনারেটর ---
   Future<void> generateAndPrintA4Invoice(Map<String, dynamic> e) async {
     final pdf = pw.Document();
     pdf.addPage(
@@ -461,7 +457,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
-  // --- ২য় মডিউল: কাস্টমার ডিউ স্টেটমেন্ট ---
   void openStatementDialog() {
     showModalBottomSheet(
       context: context,
@@ -522,7 +517,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- ৩য় মডিউল: টোটাল সামারি লাইভ ডায়ালগ ---
   void openTotalSummaryDialog() {
     showDialog(
       context: context,
@@ -547,7 +541,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- ৫ম মডিউল: ইউজার প্রোফাইল ও নতুন স্টাফ যুক্ত ---
   void openUserProfileDialog() async {
     showModalBottomSheet(
       context: context,
@@ -614,7 +607,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- ১ম মডিউল: নতুন বিল ডাটা এন্ট্রি ---
   void openAddBillDialog() {
     final nameCtrl = TextEditingController();
     final invCtrl = TextEditingController();
@@ -694,7 +686,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- ৪র্থ মডিউল: একচুয়াল কস্ট ম্যানুয়াল এন্ট্রি ---
   void openAddCostDialog() {
     final sName = TextEditingController();
     final chNo = TextEditingController();
@@ -761,7 +752,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // ক্লাউড ব্যাকআপ
   void runCloudBackup() async {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("গুগল ড্রাইভে ব্যাকআপ নেওয়া হচ্ছে...")));
     try {
@@ -825,7 +815,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
           : ListView(
               padding: const EdgeInsets.all(12),
               children: [
-                // ৪টি প্রিমিয়াম ট্রেন্ডিং কার্ড গ্রিড
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -841,10 +830,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 18),
-
-                // বিজনেস মডিউল হেডার
                 Row(
-                  mainAxisAlignment:标志Between,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text("Business Modules", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -857,8 +843,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-
-                // মডিউল গ্রিড (২ কলাম)
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -876,8 +860,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 18),
-
-                // Recent Invoices সেকশন (ফুল একশন টেবিল)
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF1E293B))),
@@ -962,8 +944,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-
-                // Quick Actions প্যানেল (৬টি রঙিন বাটন)
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF1E293B))),
@@ -1000,8 +980,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 25),
-
-                // নিচের ফুটার ব্র্যান্ডিং
                 const Center(
                   child: Text("SEWTRON ENGINEERING  |  Business Management System", style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
                 ),
@@ -1011,7 +989,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- উইজেট: প্রিমিয়াম গ্লোয়িং ট্রেন্ড কার্ড ---
   Widget modernGlowCard(String title, String val, String trend, Color bg, Color accent, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1019,11 +996,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: accent.withOpacity(0.3), width: 1.2),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [bg.withOpacity(0.4), const Color(0xFF0F172A)],
-        ),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [bg.withOpacity(0.4), const Color(0xFF0F172A)]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1032,16 +1005,8 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(color: accent.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: accent, size: 18),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: accent.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
-                child: Text(trend, style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.bold)),
-              )
+              Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: accent.withOpacity(0.2), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: accent, size: 18)),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: accent.withOpacity(0.15), borderRadius: BorderRadius.circular(4)), child: Text(trend, style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.bold))),
             ],
           ),
           Column(
@@ -1057,7 +1022,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- উইজেট: বিজনেস মডিউল বাটন কার্ড ---
   Widget moduleButtonCard(String num, String title, String sub, Color col, IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -1076,16 +1040,8 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(color: col.withOpacity(0.25), borderRadius: BorderRadius.circular(6)),
-                  child: Icon(icon, color: col, size: 16),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                  decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(4)),
-                  child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                )
+                Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: col.withOpacity(0.25), borderRadius: BorderRadius.circular(6)), child: Icon(icon, color: col, size: 16)),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5), decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(4)), child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
               ],
             ),
             Column(
@@ -1101,15 +1057,9 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // --- উইজেট: কুইক অ্যাকশন বাটন ---
   Widget quickActionButton(String title, IconData icon, Color col, VoidCallback onTap) {
     return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: col,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+      style: ElevatedButton.styleFrom(backgroundColor: col, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
       onPressed: onTap,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
